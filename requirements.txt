@@ -1,0 +1,21 @@
+# Dependências do Projeto - Pipeline de Viagens a Serviço 2025
+# Bibliotecas principais para manipulação de dados e análise
+pandas>=2.0.0
+
+# Bibliotecas de conexão e manipulação de banco de dados (PostgreSQL)
+psycopg2-binary>=2.9.0
+SQLAlchemy>=2.0.0
+
+# Gerenciamento de variáveis de ambiente
+python-dotenv>=1.0.0
+
+# Requisições HTTP e download de arquivos
+requests>=2.30.0
+
+# Visualização de dados e geração de gráficos no Jupyter Notebook
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Suporte para execução de notebooks Jupyter no VS Code
+notebook>=7.0.0
+ipykernel>=6.0.0
