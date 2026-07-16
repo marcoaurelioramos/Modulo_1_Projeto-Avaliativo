@@ -1,132 +1,194 @@
 """
-1_extrair.py
--------------------
-Faz o download do arquivo ZIP do Google Drive, extrai e insere os dados 
-em lotes diretamente nas tabelas RAW correspondentes do PostgreSQL.
+1_extrair_.py
+--------------
+Importante:
+As tabelas Raw precisam ter a mesma quantidade e a mesma ordem de colunas
+dos CSVs, pois o INSERT é feito por posição.
 """
 
-import io
 import zipfile
-import sys
 from pathlib import Path
-import requests
+
 import pandas as pd
+import requests
 
-
-PASTA_RAIZ_DETECTADA = Path(__file__).resolve().parent
-
-import builtins
-builtins.PASTA_RAIZ = PASTA_RAIZ_DETECTADA
-# --------------------------------------------------------------------
-
-
-from config import PASTA_DADOS, DRIVE_FILE_ID, ARQUIVOS, CSV_SEPARADOR, CSV_ENCODING, TAMANHO_BLOCO
 from banco import conectar, inserir_em_lote
+from config import (
+    ARQUIVOS,
+    CSV_ENCODING,
+    CSV_SEPARADOR,
+    DRIVE_FILE_ID,
+    PASTA_DADOS,
+    TAMANHO_BLOCO,
+)
 
 
 def baixar_arquivo_drive(file_id, destino_zip):
-    """Baixa o arquivo do Google Drive usando o ID público."""
-    print(f" Conectando ao Google Drive para baixar o arquivo ZIP (ID: {file_id})...")
-    
-    # URL de exportação direta do Google Drive para arquivos públicos
-    url = f"https://docs.google.com/uc?export=download&id={file_id}&confirm=t"
-    
-    # Criar a pasta de dados se não existir
+    """Baixa o arquivo ZIP do Google Drive para a pasta data."""
+
     PASTA_DADOS.mkdir(parents=True, exist_ok=True)
-    
-    with requests.Session() as session:
-        resposta = session.get(url, stream=True, timeout=60)
+
+    if destino_zip.exists():
+        print(f"Arquivo ZIP já existe em: {destino_zip}")
+        return
+
+    print("Baixando arquivo ZIP do Google Drive...")
+
+    url = "https://docs.google.com/uc?export=download"
+
+    with requests.Session() as sessao:
+        resposta = sessao.get(
+            url,
+            params={"id": file_id},
+            stream=True,
+            timeout=60,
+        )
+
         resposta.raise_for_status()
-        
-        # Salva o arquivo temporariamente na pasta configurada
-        with open(destino_zip, "wb") as f:
-            for chunk in resposta.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    
-    print(f" Download concluído! Arquivo salvo em: {destino_zip}")
+
+        # Alguns arquivos grandes do Google Drive exigem um token de confirmação.
+        token = None
+        for chave, valor in resposta.cookies.items():
+            if chave.startswith("download_warning"):
+                token = valor
+                break
+
+        if token:
+            resposta = sessao.get(
+                url,
+                params={"id": file_id, "confirm": token},
+                stream=True,
+                timeout=60,
+            )
+            resposta.raise_for_status()
+
+        with open(destino_zip, "wb") as arquivo:
+            for pedaco in resposta.iter_content(chunk_size=8192):
+                if pedaco:
+                    arquivo.write(pedaco)
+
+    print(f"Download concluído: {destino_zip}")
 
 
-def processar_e_carregar_zip(destino_zip):
-    """Abre o ZIP e carrega cada arquivo CSV mapeado nas tabelas do PostgreSQL."""
-    print(" Conectando ao banco de dados...")
+def executar_sql(conexao, comando_sql):
+    """Executa um comando SQL simples."""
+
+    cursor = conexao.cursor()
+    cursor.execute(comando_sql)
+    conexao.commit()
+    cursor.close()
+
+
+def localizar_csv_no_zip(zip_aberto, nome_csv):
+    """
+    Localiza o CSV dentro do ZIP.
+
+    A função usa Path(arquivo).name porque o CSV pode estar dentro
+    de uma pasta interna no ZIP.
+    """
+
+    for arquivo in zip_aberto.namelist():
+        if Path(arquivo).name.lower() == nome_csv.lower():
+            return arquivo
+
+    return None
+
+
+def carregar_csv(conexao, zip_aberto, nome_csv, tabela_raw):
+    """Lê um CSV dentro do ZIP e carrega na tabela Raw correspondente."""
+
+    arquivo_csv = localizar_csv_no_zip(zip_aberto, nome_csv)
+
+    if arquivo_csv is None:
+        print(f"Aviso: o arquivo {nome_csv} não foi encontrado no ZIP.")
+        return
+
+    print(f"\nProcessando {nome_csv} -> {tabela_raw}")
+
+    # Idempotência: limpa a tabela antes de carregar novamente.
+    executar_sql(conexao, f"TRUNCATE TABLE {tabela_raw};")
+
+    total_linhas = 0
+
+    with zip_aberto.open(arquivo_csv) as arquivo:
+        pedacos = pd.read_csv(
+            arquivo,
+            sep=CSV_SEPARADOR,
+            encoding=CSV_ENCODING,
+            dtype=str,
+            keep_default_na=False,
+            chunksize=TAMANHO_BLOCO,
+        )
+
+        for pedaco in pedacos:
+            # Um marcador %s para cada coluna do CSV.
+            marcadores = ", ".join(["%s"] * len(pedaco.columns))
+
+            # Não listamos os nomes das colunas.
+            # Assim evitamos erro quando os nomes do CSV são diferentes
+            # dos nomes criados na tabela Raw.
+            comando_insert = f"INSERT INTO {tabela_raw} VALUES ({marcadores})"
+
+            linhas = [tuple(linha) for linha in pedaco.to_numpy()]
+
+            inserir_em_lote(conexao, comando_insert, linhas)
+
+            total_linhas += len(linhas)
+
+            print(
+                f"Lote enviado: {len(linhas)} linhas "
+                f"(total acumulado: {total_linhas})"
+            )
+
+    print(f"Tabela {tabela_raw} carregada com {total_linhas} registros.")
+
+
+def processar_zip(caminho_zip):
+    """Abre o ZIP e carrega os 4 CSVs nas tabelas Raw."""
+
+    print("\nConectando ao PostgreSQL...")
     conexao = conectar()
-    
+    print("Conexão realizada com sucesso.")
+
     try:
-        with zipfile.ZipFile(destino_zip, "r") as z:
-            arquivos_no_zip = z.namelist()
-            print(f" Arquivos identificados dentro do ZIP: {arquivos_no_zip}")
-            
-            for chave_tipo, info in ARQUIVOS.items():
-                csv_nome = info["csv"]
-                tabela_destino = info["tabela_raw"]
-                
-                # Valida se o arquivo de configuração de fato bate com o nome dentro do ZIP
-                arquivo_alvo = next((f for f in arquivos_no_zip if f.lower() == csv_nome.lower()), None)
-                
-                if not arquivo_alvo:
-                    print(f" Aviso: Arquivo esperado '{csv_nome}' não foi encontrado dentro do ZIP. Pulando...")
-                    continue
-                
-                print(f"\n Processando '{arquivo_alvo}' -> Tabela '{tabela_destino}'")
-                
-                with z.open(arquivo_alvo) as f:
-                    lotes_pandas = pd.read_csv(
-                        f,
-                        sep=CSV_SEPARADOR,
-                        encoding=CSV_ENCODING,
-                        dtype=str,          # Garante que dados brutos entrem como texto nas tabelas RAW
-                        chunksize=TAMANHO_BLOCO
-                    )
-                    
-                    total_linhas_tabela = 0
-                    primeiro_bloco = True
-                    sql_insert = ""
-                    
-                    for bloco in lotes_pandas:
-                        # Trata os nomes das colunas vindas do CSV (remove aspas e padroniza minúsculas)
-                        bloco.columns = [
-                            col.strip().lower()
-                            .replace(' ', '_')
-                            .replace('"', '')
-                            .replace(';', '')
-                            .replace('(', '')
-                            .replace(')', '')
-                            .replace('-', '')
-                            for col in bloco.columns
-                        ]
-                        
-                        # Cria dinamicamente a query de INSERT no primeiro bloco mapeado
-                        if primeiro_bloco:
-                            colunas = ", ".join(bloco.columns)
-                            valores_placeholders = ", ".join(["%s"] * len(bloco.columns))
-                            sql_insert = f"INSERT INTO {tabela_destino} ({colunas}) VALUES ({valores_placeholders})"
-                            primeiro_bloco = False
-                        
-                        # Substitui valores NaN/Nulos do Pandas por None do Python (vira NULL no SQL)
-                        bloco = bloco.where(pd.notnull(bloco), None)
-                        
-                        # Converte o bloco do DataFrame em uma lista de tuplas para a inserção em lote
-                        linhas_tuplas = [tuple(x) for x in bloco.to_numpy()]
-                        
-                        inserir_em_lote(conexao, sql_insert, linhas_tuplas)
-                        
-                        total_linhas_tabela += len(linhas_tuplas)
-                        print(f" Lote enviado: +{len(linhas_tuplas)} linhas inseridas... (Total acumulado: {total_linhas_tabela})")
-                        
-                print(f" Sucesso total! Tabela '{tabela_destino}' completamente carregada com {total_linhas_tabela} registros.")
-                
+        with zipfile.ZipFile(caminho_zip, "r") as zip_aberto:
+            print("Arquivos encontrados no ZIP:")
+            for arquivo in zip_aberto.namelist():
+                print(f"- {arquivo}")
+
+            for info_arquivo in ARQUIVOS.values():
+                carregar_csv(
+                    conexao=conexao,
+                    zip_aberto=zip_aberto,
+                    nome_csv=info_arquivo["csv"],
+                    tabela_raw=info_arquivo["tabela_raw"],
+                )
+
+        print("\nFase 1 concluída: camada Raw carregada com sucesso.")
+
+    except Exception:
+        conexao.rollback()
+        raise
+
     finally:
-        conexao.close()
-        print("\n Conexão com o banco de dados encerrada de forma segura.")
+        if conexao is not None and not conexao.closed:
+            conexao.close()
+            print("Conexão com o PostgreSQL encerrada.")
+
+
+def main():
+    """Executa a Fase 1: download + carga Raw."""
+
+    caminho_zip = PASTA_DADOS / "viagens_2025_6meses.zip"
+
+    try:
+        baixar_arquivo_drive(DRIVE_FILE_ID, caminho_zip)
+        processar_zip(caminho_zip)
+
+    except Exception as erro:
+        print(f"\nO pipeline falhou devido ao seguinte erro: {erro}")
+        raise
 
 
 if __name__ == "__main__":
-    caminho_zip_final = PASTA_DADOS / "viagens_2025_6meses.zip"
-    
-    try:
-        #baixar_arquivo_drive(DRIVE_FILE_ID, caminho_zip_final)
-        processar_e_carregar_zip(caminho_zip_final)
-        print("\n FASE 1 CONCLUÍDA: Todos os dados foram ingeridos com sucesso nas tabelas RAW!")
-    except Exception as erro:
-        print(f"\n O pipeline falhou devido ao seguinte erro: {erro}")
+    main()
