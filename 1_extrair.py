@@ -46,7 +46,6 @@ def baixar_arquivo_drive(file_id, destino_zip):
 
         resposta.raise_for_status()
 
-        # Alguns arquivos grandes do Google Drive exigem um token de confirmação.
         token = None
         for chave, valor in resposta.cookies.items():
             if chave.startswith("download_warning"):
@@ -81,8 +80,6 @@ def executar_sql(conexao, comando_sql):
 
 def localizar_csv_no_zip(zip_aberto, nome_csv):
     """
-    Localiza o CSV dentro do ZIP.
-
     A função usa Path(arquivo).name porque o CSV pode estar dentro
     de uma pasta interna no ZIP.
     """
@@ -105,7 +102,7 @@ def carregar_csv(conexao, zip_aberto, nome_csv, tabela_raw):
 
     print(f"\nProcessando {nome_csv} -> {tabela_raw}")
 
-    # Idempotência: limpa a tabela antes de carregar novamente.
+    # Limpa a tabela antes de carregar novamente.
     executar_sql(conexao, f"TRUNCATE TABLE {tabela_raw};")
 
     total_linhas = 0
@@ -124,9 +121,6 @@ def carregar_csv(conexao, zip_aberto, nome_csv, tabela_raw):
             # Um marcador %s para cada coluna do CSV.
             marcadores = ", ".join(["%s"] * len(pedaco.columns))
 
-            # Não listamos os nomes das colunas.
-            # Assim evitamos erro quando os nomes do CSV são diferentes
-            # dos nomes criados na tabela Raw.
             comando_insert = f"INSERT INTO {tabela_raw} VALUES ({marcadores})"
 
             linhas = [tuple(linha) for linha in pedaco.to_numpy()]
@@ -164,7 +158,7 @@ def processar_zip(caminho_zip):
                     tabela_raw=info_arquivo["tabela_raw"],
                 )
 
-        print("\nFase 1 concluída: camada Raw carregada com sucesso.")
+        print("\nFase 1 concluída: Tabelas Raw carregadas com sucesso.")
 
     except Exception:
         conexao.rollback()
