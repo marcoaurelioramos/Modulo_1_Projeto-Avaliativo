@@ -17,9 +17,9 @@ CREATE DATABASE IF NOT EXISTS transparencia;
 -- ============================================================================
 
 
--- Tabela Drow Viagens
-DROP TABLE IF EXISTS raw_viagens CASCADE;
-CREATE TABLE raw_viagens (
+-- Tabela Row Viagem
+DROP TABLE IF EXISTS raw_viagem CASCADE;
+CREATE TABLE raw_viagem (
     id_viagem VARCHAR,
     num_proposta VARCHAR,
     situacao VARCHAR,
@@ -45,28 +45,31 @@ CREATE TABLE raw_viagens (
     indicador_viagem_urgente VARCHAR(10)
 );
 
--- Tabela Drow Passagens
-DROP TABLE IF EXISTS raw_passagens CASCADE;
-CREATE TABLE raw_passagens (
+-- Tabela Row Passagem
+DROP TABLE IF EXISTS raw_passagem CASCADE;
+CREATE TABLE raw_passagem (
     id_passagem VARCHAR,
     num_proposta VARCHAR,
     meio_transporte VARCHAR,
-    tipo_passagem VARCHAR,
-    emp_transporte VARCHAR,
     pais_origem_ida VARCHAR,
     uf_origem_ida VARCHAR,
     cidade_origem_ida VARCHAR,
     pais_destino_ida VARCHAR,
     uf_destino_ida VARCHAR,
     cidade_destino_ida VARCHAR,
-    data_emissao VARCHAR,
+    pais_origem_volta VARCHAR,
+    uf_origem_volta VARCHAR,
+    cidade_origem_volta VARCHAR,
+    pais_destino_volta VARCHAR,
+    uf_destino_volta VARCHAR,
+    cidade_destino_volta VARCHAR,
     valor_passagem VARCHAR,
-    valor_taxa VARCHAR,
-    valor_servico VARCHAR,
-    valor_multa VARCHAR
+    valor_taxa_servico VARCHAR,
+    data_emissao VARCHAR,
+    hora_emissao VARCHAR
 );
 
--- Tabela Drow Pagamento
+-- Tabela Row Pagamento
 DROP TABLE IF EXISTS raw_pagamento CASCADE;
 CREATE TABLE raw_pagamento (
     id_pagamento VARCHAR,
@@ -82,7 +85,7 @@ CREATE TABLE raw_pagamento (
     
 );
 
--- Tabela Drow Trecho
+-- Tabela Row Trecho
 DROP TABLE IF EXISTS raw_trecho CASCADE;
 CREATE TABLE raw_trecho (
     id_trecho VARCHAR,
