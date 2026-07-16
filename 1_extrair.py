@@ -183,6 +183,5 @@ def main():
         print(f"\nO pipeline falhou devido ao seguinte erro: {erro}")
         raise
 
-
 if __name__ == "__main__":
     main()
