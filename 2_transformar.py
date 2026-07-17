@@ -1,5 +1,5 @@
 """
-2_transforma.py
+2_transformar.py
 -------------------
 Fase 2: Lê os dados brutos da camada RAW, realiza a limpeza, a conversão 
 de tipos (datas, decimais) e insere ordenadamente na camada SILVER.
@@ -11,7 +11,7 @@ from banco import conectar
 
 
 def limpar_decimal(valor_texto):
-    """Converte o formato decimal brasileiro ('1.272,97') para float do Python."""
+       #Converte o formato decimal brasileiro ('1.272,97') para float do Python.
     if not valor_texto or valor_texto.strip() in ("", "Sem informação", "null", "None"):
         return 0.00
     try:
@@ -23,27 +23,27 @@ def limpar_decimal(valor_texto):
 
 
 def limpar_data(data_texto):
-    """Converte datas de DD/MM/AAAA para YYYY-MM-DD."""
+       #Converte datas de DD/MM/AAAA para YYYY-MM-DD.
     if not data_texto or data_texto.strip() in ("", "Sem informação", "null", "None"):
         return None
     try:
         return datetime.strptime(data_texto.strip(), "%d/%m/%Y").date()
     except ValueError:
         try:
-            # Caso a string já esteja no formato ISO
+            # Caso a string já esteja no formato correto
             return datetime.strptime(data_texto.strip(), "%Y-%m-%d").date()
         except ValueError:
             return None
 
 
 def transformar_viagens(conexao):
-    """Processa a tabela raw_viagem e popula silver_viagem."""
+       #Processa a tabela raw_viagem e insere dados na tabela silver_viagem.
     print(" Transformando dados: raw_viagem  silver_viagem...")
     
     cursor_ler = conexao.cursor()
     cursor_inserir = conexao.cursor()
     
-    # 1. Idempotência: Limpa a tabela destino (CASCADE limpa os dependentes se necessário)
+    # 1. Limpa a tabela destino (CASCADE limpa os dependentes se necessário)
     cursor_inserir.execute("TRUNCATE TABLE silver_viagem CASCADE;")
     
     # 2. Busca os dados brutos da camada RAW
@@ -111,7 +111,7 @@ def transformar_viagens(conexao):
 
 
 def transformar_pagamentos(conexao):
-    """Processa a tabela raw_pagamento e popula silver_pagamento."""
+         # Processa a tabela raw_pagamento e insere dados na tabela silver_pagamento.
     print(" Transformando dados: raw_pagamento  silver_pagamento...")
     
     cursor_ler = conexao.cursor()
@@ -134,7 +134,6 @@ def transformar_pagamentos(conexao):
         
         linhas_insercao.append((linha[0], linha[1], linha[2], linha[3], tipo_pagto, valor))
         
-    # Ajustado de 'tipo_payment' para 'tipo_pagamento' para bater com o seu CREATE TABLE
     sql_insert = """
         INSERT INTO silver_pagamento (
             id_viagem, num_proposta, nome_orgao_pagador, nome_ug_pagadora, tipo_pagamento, valor
@@ -146,7 +145,7 @@ def transformar_pagamentos(conexao):
 
 
 def transformar_passagens(conexao):
-    """Processa a tabela raw_passagem e popula silver_passagem."""
+       #Processa a tabela raw_passagem e insere dados na tabela silver_passagem.
     print(" Transformando dados: raw_passagem  silver_passagem...")
     
     cursor_ler = conexao.cursor()
@@ -187,7 +186,7 @@ def transformar_passagens(conexao):
 
 
 def transformar_trechos(conexao):
-    """Processa a tabela raw_trecho e popula silver_trecho."""
+       # Processa a tabela raw_trecho e insere dados na tabela silver_trecho.
     print(" Transformando dados: raw_trecho  silver_trecho...")
     
     cursor_ler = conexao.cursor()
@@ -247,7 +246,7 @@ def main():
     conexao = conectar()
     
     try:
-        # Carregamos primeiro as viagens por causa das chaves estrangeiras (FK)
+        
         transformar_viagens(conexao)
         transformar_pagamentos(conexao)
         transformar_passagens(conexao)
