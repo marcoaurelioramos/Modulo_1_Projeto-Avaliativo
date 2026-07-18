@@ -4,7 +4,7 @@
 -- executar este script no PostgreSQL para criar o banco de dados e as tabelas.
 -- ============================================================================
 
-CREATE DATABASE IF NOT EXISTS transparencia;
+CREATE DATABASE transparencia;
 
 
 -- ==========================================================================================
@@ -17,77 +17,80 @@ CREATE DATABASE IF NOT EXISTS transparencia;
 -- ============================================================================
 
 
--- Tabela Drow Viagens
-DROP TABLE IF EXISTS raw_viagens CASCADE;
-CREATE TABLE raw_viagens (
-    id_viagem VARCHAR,
-    num_proposta VARCHAR,
+-- Tabela Raw Viagens
+DROP TABLE IF EXISTS raw_viagem CASCADE;
+CREATE TABLE raw_viagem (
+    Identificador_do_processo_de_viagem VARCHAR,
+    numero_da_proposta_PCDP VARCHAR,
     situacao VARCHAR,
+    justificativa_urgencia_viagem VARCHAR,
     viagem_urgente VARCHAR,
-    cod_orgao_superior VARCHAR,
-    nome_orgao_superior VARCHAR,
-    cod_orgao_solicitante VARCHAR,
+    codigo_do_orgao_superior VARCHAR,
+    nome_do_orgao_superior VARCHAR,
+    codigo_orgao_solicitante VARCHAR,
     nome_orgao_solicitante VARCHAR,
     cpf_viajante VARCHAR,
-    nome_viajante VARCHAR,
+    nome VARCHAR,
     cargo VARCHAR,
     funcao VARCHAR,
-    desc_cargo_funcao VARCHAR,
-    data_inicio VARCHAR,
-    data_fim VARCHAR,
+    descricao_funcao VARCHAR,
+    periodo_data_de_inicio VARCHAR,
+    periodo_data_de_fim VARCHAR,
     destinos VARCHAR,
     motivo VARCHAR,
     valor_diarias VARCHAR,
     valor_passagens VARCHAR,
     valor_outros_gastos VARCHAR,
-    valor_devolucao VARCHAR,
-    valor_total VARCHAR,
-    indicador_viagem_urgente VARCHAR(10)
+    valor_devolucao VARCHAR
 );
 
--- Tabela Drow Passagens
-DROP TABLE IF EXISTS raw_passagens CASCADE;
-CREATE TABLE raw_passagens (
-    id_passagem VARCHAR,
-    num_proposta VARCHAR,
-    meio_transporte VARCHAR,
-    tipo_passagem VARCHAR,
-    emp_transporte VARCHAR,
+-- Tabela Raw Passagem
+DROP TABLE IF EXISTS raw_passagem CASCADE;
+CREATE TABLE raw_passagem (
+    Identificador_do_processo_de_viagem VARCHAR,
+    numero_da_proposta_PCDP VARCHAR,
+    meio_de_transporte VARCHAR,
     pais_origem_ida VARCHAR,
     uf_origem_ida VARCHAR,
     cidade_origem_ida VARCHAR,
     pais_destino_ida VARCHAR,
     uf_destino_ida VARCHAR,
     cidade_destino_ida VARCHAR,
-    data_emissao VARCHAR,
-    valor_passagem VARCHAR,
-    valor_taxa VARCHAR,
-    valor_servico VARCHAR,
-    valor_multa VARCHAR
-);
-
--- Tabela Drow Pagamento
-DROP TABLE IF EXISTS raw_pagamento CASCADE;
-CREATE TABLE raw_pagamento (
-    id_pagamento VARCHAR,
-    num_proposta VARCHAR,
-    cod_orgao_superior VARCHAR,
-    nome_orgao_superior VARCHAR,
-    cod_orgao_pagador VARCHAR,
-    nome_orgao_pagador VARCHAR,
-    cod_gestora VARCHAR,
-    nome_gestora VARCHAR,
-    tipo_pagamento VARCHAR,
-    valor_total VARCHAR,
+    pais_origem_volta VARCHAR,
+    uf_origem_volta VARCHAR,
+    cidade_origem_volta VARCHAR,
+    pais_destino_volta VARCHAR,
+    uf_destino_volta VARCHAR,
+    cidade_destino_volta VARCHAR,
+    valor_da_passagem VARCHAR,
+    taxa_de_servico VARCHAR,
+    data_emissao_compra VARCHAR,
+    hora_da_emissao_compra VARCHAR
     
 );
 
--- Tabela Drow Trecho
+-- Tabela Raw Pagamento
+DROP TABLE IF EXISTS raw_pagamento CASCADE;
+CREATE TABLE raw_pagamento (
+    Identificador_do_processo_de_viagem VARCHAR,
+    numero_da_proposta_pcdp VARCHAR,
+    codigo_orgao_superior VARCHAR,
+    nome_do_orgao_superior VARCHAR,
+    codigo_orgao_pagador VARCHAR,
+    nome_do_orgao_pagador VARCHAR,
+    codigo_da_unidade_gestora_pagadora VARCHAR,
+    nome_da_unidade_gestora_pagadora VARCHAR,
+    tipo_de_pagamento VARCHAR,
+    valor VARCHAR
+    
+);
+
+-- Tabela Raw Trecho
 DROP TABLE IF EXISTS raw_trecho CASCADE;
 CREATE TABLE raw_trecho (
-    id_trecho VARCHAR,
-    num_proposta VARCHAR,
-    seq_trecho VARCHAR,
+    identificador_do_processo_de_viagem VARCHAR,
+    numero_da_proposta_pcdp VARCHAR,
+    sequencia_trecho VARCHAR,
     origem_data VARCHAR,
     origem_pais VARCHAR,
     origem_uf VARCHAR,
@@ -96,9 +99,9 @@ CREATE TABLE raw_trecho (
     destino_pais VARCHAR,
     destino_uf VARCHAR,
     destino_cidade VARCHAR,
-    meio_transporte VARCHAR,
-    diarias VARCHAR,
-    missao VARCHAR,
+    meio_de_transporte VARCHAR,
+    numero_diarias VARCHAR,
+    missao VARCHAR
 
 );
 
@@ -158,6 +161,7 @@ CREATE TABLE silver_pagamento (
     tipo_pagamento VARCHAR(50) NOT NULL,
     valor DECIMAL(10,2) CHECK (valor >= 0)
 );
+
 
 -- Tabela Silver Trecho
 DROP TABLE IF EXISTS silver_trecho CASCADE;

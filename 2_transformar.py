@@ -38,7 +38,7 @@ def limpar_data(data_texto):
 
 def transformar_viagens(conexao):
        #Processa a tabela raw_viagem e insere dados na tabela silver_viagem.
-    print(" Transformando dados: raw_viagem  silver_viagem...")
+    print(" Transformando dados: raw_viagem silver_viagem...")
     
     cursor_ler = conexao.cursor()
     cursor_inserir = conexao.cursor()
@@ -46,13 +46,13 @@ def transformar_viagens(conexao):
     # 1. Limpa a tabela destino (CASCADE limpa os dependentes se necessário)
     cursor_inserir.execute("TRUNCATE TABLE silver_viagem CASCADE;")
     
-    # 2. Busca os dados brutos da camada RAW
+    # 2. Busca os dados brutos da camada RAW (Sem acentuação nas colunas)
     cursor_ler.execute("""
         SELECT 
-            identificador_do_processo_de_viagem, número_da_proposta_pcdp, situação, 
-            viagem_urgente, código_do_órgão_superior, nome_do_órgão_superior, 
-            nome_do_viajante, cargo, data_de_início, data_de_fim, destinos, motivo, 
-            valor_diárias, valor_passagens, valor_devolução, valor_outros_gastos
+            identificador_do_processo_de_viagem, numero_da_proposta_pcdp, situacao, 
+            viagem_urgente, codigo_do_orgao_superior, nome_do_orgao_superior, 
+            nome, cargo, periodo_data_de_inicio, periodo_data_de_fim, destinos, motivo, 
+            valor_diarias, valor_passagens, valor_devolucao, valor_outros_gastos
         FROM raw_viagem
     """)
     
@@ -62,7 +62,10 @@ def transformar_viagens(conexao):
         id_viagem = linha[0]
         num_proposta = linha[1]
         situacao = linha[2]
-        viagem_urgente = linha[3]
+        
+        # --- HIGIENIZAÇÃO E BLINDAGEM CONTRA ESTOURO VARCHAR(5) ---
+        valor_bruto = str(linha[3]).strip().title() if linha[3] else "Não"
+        viagem_urgente = valor_bruto[:5]
         cod_orgao_superior = linha[4]
         nome_orgao_superior = linha[5] if linha[5] else "Sem Informação" # NOT NULL
         nome_viajante = linha[6]
@@ -112,17 +115,17 @@ def transformar_viagens(conexao):
 
 def transformar_pagamentos(conexao):
          # Processa a tabela raw_pagamento e insere dados na tabela silver_pagamento.
-    print(" Transformando dados: raw_pagamento  silver_pagamento...")
+    print(" Transformando dados: raw_pagamento silver_pagamento...")
     
     cursor_ler = conexao.cursor()
     cursor_inserir = conexao.cursor()
     
     cursor_inserir.execute("TRUNCATE TABLE silver_pagamento CASCADE;")
     
-    # Valida integridade referencial com a tabela silver_viagem
+    # Valida integridade referencial com a tabela silver_viagem (Sem acentuação)
     cursor_ler.execute("""
-        SELECT p.identificador_do_processo_de_viagem, p.número_da_proposta_pcdp, 
-               p.nome_do_órgão_pagador, p.nome_da_ug_pagadora, p.tipo_de_pagamento, p.valor
+        SELECT p.identificador_do_processo_de_viagem, p.numero_da_proposta_pcdp, 
+               p.nome_do_orgao_pagador, p.codigo_da_unidade_gestora_pagadora, p.tipo_de_pagamento, p.valor
         FROM raw_pagamento p
         WHERE EXISTS (SELECT 1 FROM silver_viagem v WHERE v.id_viagem = p.identificador_do_processo_de_viagem)
     """)
@@ -146,7 +149,7 @@ def transformar_pagamentos(conexao):
 
 def transformar_passagens(conexao):
        #Processa a tabela raw_passagem e insere dados na tabela silver_passagem.
-    print(" Transformando dados: raw_passagem  silver_passagem...")
+    print(" Transformando dados: raw_passagem silver_passagem...")
     
     cursor_ler = conexao.cursor()
     cursor_inserir = conexao.cursor()
@@ -156,9 +159,9 @@ def transformar_passagens(conexao):
     # Valida integridade referencial com a tabela silver_viagem
     cursor_ler.execute("""
         SELECT p.identificador_do_processo_de_viagem, p.meio_de_transporte, 
-               p.país_origem_ida, p.uf_origem_ida, p.cidade_origem_ida, 
-               p.país_destino_ida, p.uf_destino_ida, p.cidade_destino_ida, 
-               p.valor_da_passagem, p.taxa_de_serviço, p.data_de_emissão
+               p.pais_origem_ida, p.uf_origem_ida, p.cidade_origem_ida, 
+               p.pais_destino_ida, p.uf_destino_ida, p.cidade_destino_ida, 
+               p.valor_da_passagem, p.taxa_de_servico, p.data_emissao_compra
         FROM raw_passagem p
         WHERE EXISTS (SELECT 1 FROM silver_viagem v WHERE v.id_viagem = p.identificador_do_processo_de_viagem)
     """)
@@ -187,19 +190,19 @@ def transformar_passagens(conexao):
 
 def transformar_trechos(conexao):
        # Processa a tabela raw_trecho e insere dados na tabela silver_trecho.
-    print(" Transformando dados: raw_trecho  silver_trecho...")
+    print(" Transformando dados: raw_trecho silver_trecho...")
     
     cursor_ler = conexao.cursor()
     cursor_inserir = conexao.cursor()
     
     cursor_inserir.execute("TRUNCATE TABLE silver_trecho CASCADE;")
     
-    # Valida integridade referencial com a tabela silver_viagem
+    # Valida integridade referencial com a tabela silver_viagem (Sem acentuação)
     cursor_ler.execute("""
-        SELECT t.identificador_do_processo_de_viagem, t.sequência_trecho, 
+        SELECT t.identificador_do_processo_de_viagem, t.sequencia_trecho, 
                t.origem_data, t.origem_uf, t.origem_cidade, 
                t.destino_data, t.destino_uf, t.destino_cidade, 
-               t.meio_de_transporte, t.número_de_diárias
+               t.meio_de_transporte, t.numero_diarias
         FROM raw_trecho t
         WHERE EXISTS (SELECT 1 FROM silver_viagem v WHERE v.id_viagem = t.identificador_do_processo_de_viagem)
     """)
@@ -246,12 +249,11 @@ def main():
     conexao = conectar()
     
     try:
-        
         transformar_viagens(conexao)
         transformar_pagamentos(conexao)
         transformar_passagens(conexao)
         transformar_trechos(conexao)
-        print("\n FASE 2 CONCLUÍDA: Camada Silver populada e higienizada com sucesso!")
+        print("\n FASE 2 CONCLUÍDA: Dados inseridos e Camada Silver e higienizada com sucesso!")
         
     except Exception as erro:
         conexao.rollback()
